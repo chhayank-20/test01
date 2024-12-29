@@ -1,0 +1,9 @@
+made user model 
+post model 
+added mail feature 
+added authentication
+completed jwt 
+added images feature
+
+
+

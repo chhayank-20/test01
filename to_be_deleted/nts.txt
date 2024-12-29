@@ -1,0 +1,310 @@
+
+
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+    },
+    username: { 
+      type: String, 
+      required: true, 
+      unique: true,
+    },
+    email: { 
+      type: String, 
+      required: true, 
+      unique: true, 
+      match: [/.+@.+\..+/, 'Please fill a valid email address'],  // Email validation
+    },
+    password: { 
+      type: String, 
+      required: true,
+    },
+    profilePicture: {
+      type: String,
+      default: "",
+    },
+    bannerImg: {
+      type: String,
+      default: "",
+    },
+    headline: {
+      type: String,
+      default: "",
+    },
+    location: {
+      type: String, 
+      default: "",
+    },
+    about: {
+      type: String,
+      default: "",
+    },
+    skills: [String],
+    experience: [
+      {
+        title: String,
+        company: String,
+        startDate: Date,
+        endDate: { 
+          type: Date, 
+          default: null, // If the user is still employed, endDate can be null
+        },
+        description: String,
+        isCurrentJob: { type: Boolean, default: false },  // Add a flag for current job
+      },
+    ],
+    education: [
+      {
+        school: String,
+        fieldOfStudy: String,
+        startYear: Number,
+        endYear: Number,
+      },
+    ],
+    connections: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+  },
+  { 
+    timestamps: true 
+  }
+);
+
+// Pre-save hook to hash password before saving
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();  // If the password is not modified, skip hashing
+  this.password = await bcrypt.hash(this.password, 10);  // Hash the password with bcrypt
+  next();
+});
+
+const User = mongoose.model('User', userSchema);
+module.exports = User;
+
+
+-------------------------------------------------------------------
+
+const postSchema = new mongoose.Schema({
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+    },
+    content: {
+        type: String,
+        required: true,
+    },
+    image: {
+        type: String, // URL of the image (if uploaded)
+        default: '',
+    },
+    comments: [{
+        Comment : String
+        type: mongoose.Schema.Types.ObjectId  // .populate 
+        ref: 'User',
+    }],
+    likes: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    }],
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now,
+    },
+});
+
+
+-------------------------------------------------------------------
+
+
+const postSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    content: {
+      type: String,
+      required: true,
+      maxlength: 1000,  // Limit the content length to avoid excessive text
+    },
+    image: {
+      type: String, // URL of the image (if uploaded)  // cloudnery 
+      default: '',
+      match: [/^https?:\/\/.+/i, 'Please provide a valid URL for the image'],  // Validate URL format (optional)
+    },
+    comments: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Comment',
+      },
+    ],
+    likes: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+      default: [], // Initialize as an empty array
+      unique: true, // Prevent duplicate likes from the same user
+    },
+  },
+  { timestamps: true }  
+);
+
+// Optional: Pre-save hook to ensure that updatedAt is set to the current date whenever the post is updated.
+postSchema.pre('save', function (next) {
+  if (this.isModified()) {
+    this.updatedAt = Date.now();
+  }
+  next();
+});
+
+
+-------------------------------------------------------------------
+
+
+const mongoose = require('mongoose');
+const messageSchema = new mongoose.Schema({
+  sender: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  receiver: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  text: {
+    type: String,
+    required: true,
+  },
+  messageType: {
+    type: String,
+    enum: ['text', 'image', 'video', 'file'],
+    default: 'text',
+  },
+  mediaUrl: {
+    type: String,
+    default: '',  // For media messages like image, video, or files
+  },
+  conversationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Conversation',  // Optional, if you want to support threads
+  },
+  isEdited: {
+    type: Boolean,
+    default: false,
+  },
+  editedAt: {
+    type: Date,
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now,
+  },
+  status: {
+    type: String,
+    enum: ['sent', 'read'],
+    default: 'sent',
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+  deletedBySender: {
+    type: Boolean,
+    default: false,
+  },
+  deletedByReceiver: {
+    type: Boolean,
+    default: false,
+  },
+  mentionedUsers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+  ],
+  reactions: [
+    {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      reactionType: { type: String, enum: ['like', 'love', 'laugh', 'sad', 'angry'] },
+    },
+  ],
+  isNotified: {
+    type: Boolean,
+    default: false,
+  },
+});
+module.exports = mongoose.model('Message', messageSchema);
+
+-----------------------------------------------------
+
+const mongoose = require('mongoose');
+const conversationSchema = new mongoose.Schema({
+  participants: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+  ],
+  messages: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+    },
+  ],
+  lastMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+module.exports = mongoose.model('Conversation', conversationSchema);
+
+
+
+
+
+
+
+
+models 
+user signup , login  - tomorrow 
+
+
+authentication - jwt , 
+welcome mail - nodemailer 
+
+
+  --- after presentation 
+add post ,
+build connections 
+jobs 
+
+
+
+
+ cloudnery , nodemailer , jwt , 
+
+
+
+
+
+
+
+
